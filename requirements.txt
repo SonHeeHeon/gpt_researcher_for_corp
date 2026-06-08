@@ -62,6 +62,8 @@ langchain-mcp-adapters>=0.1.0
 
 # Data Handling
 sqlalchemy>=2.0.28
+psycopg[binary,pool]>=3.2.0
+pgvector>=0.3.6
 python-multipart>=0.0.6
 json-repair>=0.29.8
 json5>=0.9.25

@@ -15,8 +15,10 @@ from .mcp import MCPRetriever
 from .bocha.bocha import BoChaSearch
 from .xquik.xquik import XquikSearch
 from .openalex.openalex import OpenAlexSearch
+from .postgres_news.postgres_news import PostgresNewsSearch
 
 __all__ = [
+    "PostgresNewsSearch",
     "TavilySearch",
     "CustomRetriever",
     "Duckduckgo",

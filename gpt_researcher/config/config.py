@@ -74,13 +74,10 @@ class Config:
                 value = self.convert_env_value(key, env_value, BaseConfig.__annotations__[key])
             setattr(self, key.lower(), value)
 
-        # Handle RETRIEVER with default value
-        retriever_env = os.environ.get("RETRIEVER", config.get("RETRIEVER", "tavily"))
-        try:
-            self.retrievers = self.parse_retrievers(retriever_env)
-        except ValueError as e:
-            print(f"Warning: {str(e)}. Defaulting to 'tavily' retriever.")
-            self.retrievers = ["tavily"]
+        # Handle RETRIEVER with fail-closed validation. Do not silently fall
+        # back to an external search provider in private network deployments.
+        retriever_env = os.environ.get("RETRIEVER", config.get("RETRIEVER", "postgres_news"))
+        self.retrievers = self.parse_retrievers(retriever_env)
 
     def _set_embedding_attributes(self) -> None:
         """Parse and set embedding provider and model attributes."""

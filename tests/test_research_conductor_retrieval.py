@@ -31,6 +31,9 @@ class FakeFullContentRetriever:
         return [
             {
                 "href": "https://example.com/full",
+                "title": "Full article",
+                "source": "Example News",
+                "published_at": "2026-06-08T00:00:00",
                 "body": "short summary",
                 "raw_content": "C" * 500,
             }
@@ -74,7 +77,23 @@ class ResearchConductorRetrievalTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(urls, [])
         self.assertEqual(
             prefetched,
-            [{"url": "https://example.com/full", "raw_content": "C" * 500}],
+            [{
+                "url": "https://example.com/full",
+                "raw_content": "C" * 500,
+                "title": "Full article",
+                "source": "Example News",
+                "published_at": "2026-06-08T00:00:00",
+            }],
+        )
+        self.assertEqual(researcher.visited_urls, {"https://example.com/full"})
+        self.assertEqual(
+            researcher.research_sources,
+            [{
+                "url": "https://example.com/full",
+                "title": "Full article",
+                "source": "Example News",
+                "published_at": "2026-06-08T00:00:00",
+            }],
         )
 
 

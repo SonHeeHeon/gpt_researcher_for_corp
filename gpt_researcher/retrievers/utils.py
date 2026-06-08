@@ -60,6 +60,7 @@ def check_pkg(pkg: str) -> None:
 
 # Valid retrievers for fallback
 VALID_RETRIEVERS = [
+    "postgres_news",
     "tavily",
     "custom",
     "duckduckgo",

@@ -780,11 +780,22 @@ class ResearchConductor:
                     if url and raw_content and len(raw_content) > 100:
                         # Only raw_content signals that a retriever already fetched the full page.
                         # body is snippet-sized text for most web retrievers and still needs scraping.
+                        new_prefetched_urls = await self._get_new_urls([url])
+                        if not new_prefetched_urls:
+                            continue
                         prefetched_content.append({
                             "url": url,
                             "raw_content": raw_content,
+                            "title": result.get("title", ""),
+                            "source": result.get("source", ""),
+                            "published_at": result.get("published_at"),
                         })
-                        self.researcher.add_research_sources([{"url": url}])
+                        self.researcher.add_research_sources([{
+                            "url": url,
+                            "title": result.get("title", ""),
+                            "source": result.get("source", ""),
+                            "published_at": result.get("published_at"),
+                        }])
                     elif url:
                         new_search_urls.append(url)
             except Exception as e:

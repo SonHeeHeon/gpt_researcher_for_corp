@@ -9,7 +9,7 @@ def get_retriever(retriever: str):
     """Get a retriever class by name.
 
     Args:
-        retriever: The name of the retriever to get (e.g., 'google', 'tavily', 'duckduckgo').
+        retriever: The name of the retriever to get (e.g., 'postgres_news', 'google', 'duckduckgo').
 
     Returns:
         The retriever class if found, None otherwise.
@@ -24,6 +24,7 @@ def get_retriever(retriever: str):
         - bing: Bing search
         - arxiv: arXiv academic search
         - tavily: Tavily search API
+        - postgres_news: PostgreSQL/pgvector-backed internal news search
         - exa: Exa search
         - semantic_scholar: Semantic Scholar academic search
         - pubmed_central: PubMed Central medical literature
@@ -73,6 +74,10 @@ def get_retriever(retriever: str):
             from gpt_researcher.retrievers import TavilySearch
 
             return TavilySearch
+        case "postgres_news":
+            from gpt_researcher.retrievers import PostgresNewsSearch
+
+            return PostgresNewsSearch
         case "exa":
             from gpt_researcher.retrievers import ExaSearch
 
@@ -137,11 +142,26 @@ def get_retrievers(headers: dict[str, str], cfg):
         retrievers = [cfg.retriever]
     # If still not set, use default retriever
     else:
-        retrievers = [get_default_retriever().__name__]
+        retrievers = ["postgres_news"]
 
-    # Convert retriever names to actual retriever classes
-    # Use get_default_retriever() as a fallback for any invalid retriever names
-    retriever_classes = [get_retriever(r) or get_default_retriever() for r in retrievers]
+    retrievers = [retriever.strip() for retriever in retrievers if retriever.strip()]
+    if not retrievers:
+        raise ValueError("No retriever configured. Set RETRIEVER to a supported retriever name.")
+
+    retriever_classes = []
+    invalid_retrievers = []
+    for retriever in retrievers:
+        retriever_class = get_retriever(retriever)
+        if retriever_class is None:
+            invalid_retrievers.append(retriever)
+        else:
+            retriever_classes.append(retriever_class)
+
+    if invalid_retrievers:
+        raise ValueError(
+            f"Invalid retriever(s): {', '.join(invalid_retrievers)}. "
+            "Set RETRIEVER to a supported retriever name."
+        )
     
     return retriever_classes
 
@@ -150,8 +170,8 @@ def get_default_retriever():
     """Get the default retriever class.
 
     Returns:
-        The TavilySearch retriever class as the default search provider.
+        The PostgresNewsSearch retriever class as the default search provider.
     """
-    from gpt_researcher.retrievers import TavilySearch
+    from gpt_researcher.retrievers import PostgresNewsSearch
 
-    return TavilySearch
+    return PostgresNewsSearch

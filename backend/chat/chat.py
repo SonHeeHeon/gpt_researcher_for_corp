@@ -1,7 +1,5 @@
 import logging
-import os
 import uuid
-import json
 from fastapi import WebSocket
 from typing import List, Dict, Any
 
@@ -9,9 +7,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import InMemoryVectorStore
 from gpt_researcher.memory import Memory
 from gpt_researcher.config.config import Config
-from gpt_researcher.utils.llm import create_chat_completion
+from gpt_researcher.actions.retriever import get_retriever
 from gpt_researcher.utils.tools import create_chat_completion_with_tools, create_search_tool
-from tavily import TavilyClient
 from datetime import datetime
 
 # Setup logging
@@ -66,14 +63,7 @@ class ChatAgentWithMemory:
         self.vector_store = vector_store
         self.retriever = None
         self.search_metadata = None
-        
-        # Initialize Tavily client (optional - only if API key is available)
-        tavily_api_key = os.environ.get("TAVILY_API_KEY")
-        if tavily_api_key:
-            self.tavily_client = TavilyClient(api_key=tavily_api_key)
-        else:
-            self.tavily_client = None
-            logger.warning("TAVILY_API_KEY not set - web search in chat will be disabled")
+        self.search_retriever_class = self._resolve_search_retriever()
         
         # Process document and create vector store if not provided
         if not self.vector_store and False:
@@ -111,43 +101,59 @@ class ChatAgentWithMemory:
         documents = text_splitter.split_text(report)
         return documents
 
+    def _resolve_search_retriever(self):
+        for retriever_name in getattr(self.config, "retrievers", []) or []:
+            if retriever_name == "mcp":
+                continue
+            retriever_class = get_retriever(retriever_name)
+            if retriever_class is not None:
+                return retriever_class
+        logger.warning("No configured retriever is available for chat quick_search")
+        return None
+
     def quick_search(self, query):
-        """Perform a web search for current information using Tavily"""
+        """Search current information using the configured GPT Researcher retriever."""
         try:
-            # Check if Tavily client is available
-            if self.tavily_client is None:
-                logger.warning(f"Tavily client not available, skipping web search for: {query}")
+            if self.search_retriever_class is None:
                 self.search_metadata = {
                     "query": query,
                     "sources": [],
-                    "error": "Web search is disabled - TAVILY_API_KEY not configured"
+                    "error": "Search is disabled - no retriever is configured"
                 }
                 return {
-                    "error": "Web search is disabled - TAVILY_API_KEY not configured",
+                    "error": "Search is disabled - no retriever is configured",
                     "results": []
                 }
-            
-            logger.info(f"Performing web search for: {query}")
-            results = self.tavily_client.search(query=query, max_results=5)
-            
+
+            logger.info(f"Performing quick_search with {self.search_retriever_class.__name__}: {query}")
+            retriever = self.search_retriever_class(query=query, headers=self.headers)
+            results = retriever.search(max_results=5) or []
+
             # Store search metadata for frontend
             self.search_metadata = {
                 "query": query,
                 "sources": [
-                    {"title": result.get("title", ""), 
-                     "url": result.get("url", ""),
-                     "content": result.get("content", "")[:200] + "..." if len(result.get("content", "")) > 200 else result.get("content", "")}
-                    for result in results.get("results", [])
+                    {
+                        "title": result.get("title", ""),
+                        "url": result.get("url") or result.get("href", ""),
+                        "content": self._result_preview(result),
+                    }
+                    for result in results
                 ]
             }
-            
-            return results
+
+            return {"results": results}
         except Exception as e:
             logger.error(f"Error performing web search: {str(e)}", exc_info=True)
             return {
                 "error": str(e),
                 "results": []
             }
+
+    @staticmethod
+    def _result_preview(result: Dict[str, Any]) -> str:
+        content = result.get("body") or result.get("raw_content") or result.get("content") or ""
+        return content[:200] + "..." if len(content) > 200 else content
 
 
     async def process_chat_completion(self, messages: List[Dict[str, str]]):
